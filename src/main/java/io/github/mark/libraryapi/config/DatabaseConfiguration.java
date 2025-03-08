@@ -1,6 +1,5 @@
 package io.github.mark.libraryapi.config;
 
-
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,8 +28,7 @@ public class DatabaseConfiguration {
         config.setJdbcUrl(url);
         config.setDriverClassName(driver);
 
-
-        config.setMaximumPoolSize(10); // Máximo de conexções liberadas
+        config.setMaximumPoolSize(10); // Máximo de conexções liberwwadas
         config.setMinimumIdle(1); //Tamanho inicial do pool
         config.setPoolName("library-db-pool");
         config.setMaxLifetime(600000);

@@ -1,12 +1,17 @@
 package io.github.mark.libraryapi.services;
 
-import io.github.mark.libraryapi.dto.AtualizarAutorRequest;
+import io.github.mark.libraryapi.controller.dto.AtualizarAutorRequest;
+import io.github.mark.libraryapi.exceptions.OperacaoNaoPermitidaException;
 import io.github.mark.libraryapi.model.Autor;
 import io.github.mark.libraryapi.model.Livro;
+import io.github.mark.libraryapi.model.Usuario;
 import io.github.mark.libraryapi.repository.AutorRepository;
 import io.github.mark.libraryapi.repository.LivroRepository;
+import io.github.mark.libraryapi.security.SecurityService;
 import io.github.mark.libraryapi.validator.AutorValidator;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.ExampleMatcher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,18 +20,19 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class AutorService {
-    @Autowired
-    private AutorRepository autorRepository;
-    @Autowired
-    private LivroRepository livroRepository;
-    @Autowired
-    private AutorValidator autorValidator;
+    private final AutorRepository autorRepository;
+    private final LivroRepository livroRepository;
+    private final AutorValidator autorValidator;
+    private final SecurityService securityService;
 
     //Salvar um autor
     @Transactional
     public Autor save(Autor autor){
         autorValidator.validate(autor);
+        Usuario usuario = securityService.autenticar();
+        autor.setUsuario(usuario);
         return autorRepository.save(autor);
     }
 
@@ -37,6 +43,8 @@ public class AutorService {
             throw new IllegalArgumentException("Para atualizar é necessário que o autor já esteja salvo na base");
         }
         autorValidator.validate(autor);
+        Usuario usuario = securityService.autenticar();
+        autor.setUsuario(usuario);
         autorRepository.save(autor);
     }
 
@@ -58,12 +66,14 @@ public class AutorService {
         return autorRepository.count();
     }
 
-    //Deletar por id
-    public void removerAutor(UUID id){
-        if(autorRepository.existsById(id)){
-            autorRepository.deleteById(id);
+    //Deletar autor
+    //Aqui verificamos se o autor tem livro ou não, se não tiver, ele faz a exclusão normalmente
+    public void removerAutor(Autor autor){
+        if(possuiLivro(autor)){
+            throw new OperacaoNaoPermitidaException("Não é permitido!! Autor já existe");
         }
-        throw new IllegalArgumentException("Não existe autor com esse id");
+
+        autorRepository.delete(autor);
     }
 
     //Atualizar autor
@@ -97,5 +107,19 @@ public class AutorService {
         }
 
         return autorRepository.findAll();
+    }
+
+    public List<Autor> pesquisaByExample(String nome, String nacionalidade){
+        var autor = new Autor();
+        autor.setNome(nome);
+        autor.setNacionalidade(nacionalidade);
+        ExampleMatcher matcher = ExampleMatcher.matching().withIgnorePaths("id","dataNascimento", "dataCadastro").withIgnoreNullValues().withIgnoreCase(true).withStringMatcher(ExampleMatcher.StringMatcher.CONTAINING);
+        Example<Autor> autorExample = Example.of(autor, matcher);
+        return autorRepository.findAll(autorExample);
+    }
+
+    //Aqui eu verifico se o autor que eu quero deletar, possui um livro, se caso ele possuir algum livro, ele não pode ser deletado
+    public boolean possuiLivro(Autor autor){
+        return livroRepository.existsByAutor(autor);
     }
 }
